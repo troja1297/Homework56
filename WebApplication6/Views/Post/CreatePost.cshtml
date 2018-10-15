@@ -1,0 +1,35 @@
+﻿@model WebApplication6.Models.PostViewModel
+@using WebApplication6.Controllers
+@inject SignInManager<ApplicationUser> SignInManager
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> UserManager
+
+@{
+    ViewData["Title"] = "Create Post";
+
+}
+
+<form asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post" enctype="multipart/form-data">
+    <div class="text-danger"></div>
+    <div class="form-group">
+        <label asp-for="PostPhoto">Add Photo</label>
+        <input asp-for="PostPhoto" class="form-control" />
+        <div asp-validation-summary="All" class="text-danger"></div>
+    </div>
+    <div class="form-group">
+        <label asp-for="Title">Title</label>
+        <input asp-for="Title" class="form-control" />
+        <span asp-validation-for="Title" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Description"> Description</label>
+        <input asp-for="Description" class="form-control" />
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-default">Create Post</button>
+</form>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

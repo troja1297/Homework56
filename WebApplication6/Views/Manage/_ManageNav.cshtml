@@ -1,5 +1,7 @@
-﻿@using WebApplication6.Views.Manage
+﻿@using WebApplication6.Controllers
+
 @inject SignInManager<ApplicationUser> SignInManager
+
 @{
     var hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
 }
@@ -12,5 +14,21 @@
         <li class="@ManageNavPages.ExternalLoginsNavClass(ViewContext)"><a asp-action="ExternalLogins">External logins</a></li>
     }
     <li class="@ManageNavPages.TwoFactorAuthenticationNavClass(ViewContext)"><a asp-action="TwoFactorAuthentication">Two-factor authentication</a></li>
+    <li class="@ManageNavPages.ExternalLoginsNavClass(ViewContext)"><a asp-action="ExternalLogins">External logins</a></li>
+    <li class="@ManageNavPages.CreatePostClass(ViewContext)"><a asp-action="CreatePost">Create Post</a></li>
+
+    <li class="@ManageNavPages.UsersClass(ViewContext)">
+        @if (User.IsInRole("admin"))
+        {
+            <a asp-action="UserList">Users List</a>
+        }
+    </li>
+    <li class="@ManageNavPages.RolesClass(ViewContext)">
+        @if (User.IsInRole("admin"))
+        {
+            <a asp-action="RolesList">Roles List</a>
+        }
+    </li>
+
 </ul>
 

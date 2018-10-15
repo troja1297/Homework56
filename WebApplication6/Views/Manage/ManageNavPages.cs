@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
@@ -19,6 +20,12 @@ namespace WebApplication6.Views.Manage
 
         public static string TwoFactorAuthentication => "TwoFactorAuthentication";
 
+        public static string Users => "UserList";
+
+        public static string Roles => "RolesList";
+
+        public static string CreatePost => "CreatePost";
+
         public static string IndexNavClass(ViewContext viewContext) => PageNavClass(viewContext, Index);
 
         public static string ChangePasswordNavClass(ViewContext viewContext) => PageNavClass(viewContext, ChangePassword);
@@ -26,6 +33,12 @@ namespace WebApplication6.Views.Manage
         public static string ExternalLoginsNavClass(ViewContext viewContext) => PageNavClass(viewContext, ExternalLogins);
 
         public static string TwoFactorAuthenticationNavClass(ViewContext viewContext) => PageNavClass(viewContext, TwoFactorAuthentication);
+
+        public static string UsersClass(ViewContext viewContext) => PageNavClass(viewContext, Users);
+
+        public static string RolesClass(ViewContext viewContext) => PageNavClass(viewContext, Roles);
+
+        public static string CreatePostClass(ViewContext viewContext) => PageNavClass(viewContext, CreatePost);
 
         public static string PageNavClass(ViewContext viewContext, string page)
         {

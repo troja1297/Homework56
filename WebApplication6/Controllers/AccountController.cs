@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using WebApplication6.Models;
 using WebApplication6.Models.AccountViewModels;
 using WebApplication6.Services;
@@ -20,21 +20,30 @@ namespace WebApplication6.Controllers
     [Route("[controller]/[action]")]
     public class AccountController : Controller
     {
+        RoleManager<Microsoft.AspNetCore.Identity.IdentityRole> _roleManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEmailSender _emailSender;
         private readonly ILogger _logger;
+        private IHostingEnvironment _environment;
+        private FileUploadService _fileUploadService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IEmailSender emailSender,
-            ILogger<AccountController> logger)
+            RoleManager<IdentityRole> roleManager,
+            ILogger<AccountController> logger,
+            FileUploadService fileUploadService,
+            IHostingEnvironment environment)
         {
+            _roleManager = roleManager;
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
             _logger = logger;
+            _fileUploadService = fileUploadService;
+            _environment = environment;
         }
 
         [TempData]
@@ -61,7 +70,7 @@ namespace WebApplication6.Controllers
             {
                 // This doesn't count login failures towards account lockout
                 // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
+                var result = await _signInManager.PasswordSignInAsync(model.Login, model.Password, model.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
@@ -217,15 +226,41 @@ namespace WebApplication6.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
+
             ViewData["ReturnUrl"] = returnUrl;
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
+                string path = Path.Combine(
+                    _environment.WebRootPath,
+                    $"images\\{model.Name}\\");
+                var userPhoto = $"/images/{model.Name}/{model.UserPhoto.FileName}";
+                _fileUploadService.Upload(path, model.UserPhoto.FileName, model.UserPhoto);
+                var user = new ApplicationUser
+                {
+                    UserName = model.Email,
+                    Email = model.Email,
+                    Name = model.Name,
+                    Login = model.Login,
+                    PhoneNumber = model.Phone,
+                    Information = model.Information,
+                    Gender = model.Gender == 1 ? "Woman" : "Man",
+                    Path = userPhoto
+                };
                 var result = await _userManager.CreateAsync(user, model.Password);
+                
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User created a new account with password.");
-
+                    
+                     
+                    if (_roleManager.Roles.Any(r => r.Name == "admin"))
+                    {
+                        await _userManager.AddToRolesAsync(user, new[] { "admin" });
+                    }
+                    else
+                    {
+                        await _userManager.AddToRolesAsync(user, new[] { "user" });
+                    }
                     var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                     var callbackUrl = Url.EmailConfirmationLink(user.Id, code, Request.Scheme);
                     await _emailSender.SendEmailConfirmationAsync(model.Email, callbackUrl);
@@ -236,6 +271,8 @@ namespace WebApplication6.Controllers
                 }
                 AddErrors(result);
             }
+
+
 
             // If we got this far, something failed, redisplay form
             return View(model);
@@ -458,7 +495,7 @@ namespace WebApplication6.Controllers
                 return RedirectToAction(nameof(HomeController.Index), "Home");
             }
         }
-
         #endregion
+
     }
 }

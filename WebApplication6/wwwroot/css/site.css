@@ -10,6 +10,13 @@
     padding-right: 15px;
 }
 
+.modal-backdrop.fade.in {
+    z-index: 2000;
+}
+
+body > div.modal-backdrop.fade.in {
+    z-index: 1010;
+}
 /* Carousel */
 .carousel-caption p {
     font-size: 20px;

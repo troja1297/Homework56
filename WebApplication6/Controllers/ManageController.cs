@@ -1,17 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using WebApplication6.Data;
 using WebApplication6.Models;
+using WebApplication6.Models.AccountViewModels;
+using WebApplication6.Models.AdminViewModels;
 using WebApplication6.Models.ManageViewModels;
+using WebApplication6.Models.PostViewModels;
 using WebApplication6.Services;
 
 namespace WebApplication6.Controllers
@@ -20,27 +26,41 @@ namespace WebApplication6.Controllers
     [Route("[controller]/[action]")]
     public class ManageController : Controller
     {
+        RoleManager<Microsoft.AspNetCore.Identity.IdentityRole> _roleManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEmailSender _emailSender;
         private readonly ILogger _logger;
         private readonly UrlEncoder _urlEncoder;
+        private IHostingEnvironment _environment;
+        private FileUploadService _fileUploadService;
+        private static ApplicationDbContext _context;
 
         private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
         private const string RecoveryCodesKey = nameof(RecoveryCodesKey);
+
+        public IActionResult UserList() => View(_userManager.Users.ToList());
 
         public ManageController(
           UserManager<ApplicationUser> userManager,
           SignInManager<ApplicationUser> signInManager,
           IEmailSender emailSender,
           ILogger<ManageController> logger,
-          UrlEncoder urlEncoder)
+          RoleManager<IdentityRole> roleManager,
+          UrlEncoder urlEncoder,
+          FileUploadService fileUploadService,
+          IHostingEnvironment environment,
+          ApplicationDbContext context)
         {
+            _context = context;
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
             _logger = logger;
             _urlEncoder = urlEncoder;
+            _roleManager = roleManager;
+            _fileUploadService = fileUploadService;
+            _environment = environment;
         }
 
         [TempData]
@@ -57,8 +77,11 @@ namespace WebApplication6.Controllers
 
             var model = new IndexViewModel
             {
-                Username = user.UserName,
+                Information = user.Information,
+                PhotoPath = user.Path,
+                Username = user.Login,
                 Email = user.Email,
+                Gender = user.Gender,
                 PhoneNumber = user.PhoneNumber,
                 IsEmailConfirmed = user.EmailConfirmed,
                 StatusMessage = StatusMessage
@@ -110,10 +133,7 @@ namespace WebApplication6.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SendVerificationEmail(IndexViewModel model)
         {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
+            
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -541,5 +561,144 @@ namespace WebApplication6.Controllers
         }
 
         #endregion
+
+        public async Task<IActionResult> EditRole(string userId)
+        {
+            // получаем пользователя
+            ApplicationUser user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                // получем список ролей пользователя
+                var userRoles = await _userManager.GetRolesAsync(user);
+                var allRoles = _roleManager.Roles.ToList();
+                ChangeRoleViewModel model = new ChangeRoleViewModel
+                {
+                    UserId = user.Id,
+                    UserEmail = user.Email,
+                    UserRoles = userRoles,
+                    AllRoles = allRoles
+                };
+                return View(model);
+            }
+
+            return NotFound();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Editrole(string userId, List<string> roles)
+        {
+            // получаем пользователя
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                // получем список ролей пользователя
+                var userRoles = await _userManager.GetRolesAsync(user);
+                // получаем все роли
+                var allRoles = _roleManager.Roles.ToList();
+                // получаем список ролей, которые были добавлены
+                var addedRoles = roles.Except(userRoles);
+                // получаем роли, которые были удалены
+                var removedRoles = userRoles.Except(roles);
+
+                await _userManager.AddToRolesAsync(user, addedRoles);
+
+                await _userManager.RemoveFromRolesAsync(user, removedRoles);
+
+                return RedirectToAction("UserList");
+            }
+
+            return NotFound();
+        }
+
+        public IActionResult CreateRole() => View();
+        [HttpPost]
+        public async Task<IActionResult> CreateRole(string name)
+        {
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                IdentityResult result = await _roleManager.CreateAsync(new IdentityRole(name));
+                if (result.Succeeded)
+                {
+                    return RedirectToAction("RolesList");
+                }
+                else
+                {
+                    foreach (var error in result.Errors)
+                    {
+                        ModelState.AddModelError(string.Empty, error.Description);
+                    }
+                }
+            }
+            return View(name);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteRole(string id)
+        {
+            IdentityRole role = await _roleManager.FindByIdAsync(id);
+            if (role != null)
+            {
+                IdentityResult result = await _roleManager.DeleteAsync(role);
+            }
+            return RedirectToAction("RolesList");
+        }
+
+        public IActionResult RolesList() => View(_roleManager.Roles.ToList());
+
+
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult CreatePost(string returnUrl = null)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreatePost(PostViewModel model, string returnUrl = null)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            ViewData["ReturnUrl"] = returnUrl;
+            if (ModelState.IsValid)
+            {
+                string mpath = Path.Combine(
+                    _environment.WebRootPath,
+                    $"images\\{model.Name}\\{model.Title}");
+                var postPhoto = $"/images/{model.Name}/{model.PostPhoto.FileName}";
+                _fileUploadService.Upload(mpath, model.PostPhoto.FileName, model.PostPhoto);
+                var postModel = new PostModel()
+                {
+                    Time = DateTime.Now,
+                    Likes = 0,
+                    Description = model.Description,
+                    Title = model.Title,
+                    PostPhoto = postPhoto,
+                    OwnerId = user.Id,
+                    Owner = user
+                };
+
+                _context.AddAsync(postModel);
+                await _context.SaveChangesAsync();
+                return RedirectToLocal(returnUrl);
+            }
+            return View(model);
+        }
+
+        private IActionResult RedirectToLocal(string returnUrl)
+        {
+            if (Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+            else
+            {
+                return RedirectToAction(nameof(HomeController.Index), "Home");
+            }
+        }
+
     }
 }
+

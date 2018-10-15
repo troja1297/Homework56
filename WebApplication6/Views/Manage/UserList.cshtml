@@ -1,0 +1,18 @@
+﻿@using WebApplication6.Views.Manage
+@model IEnumerable<WebApplication6.Models.ApplicationUser>
+@{
+    ViewData["Title"] = "Users";
+    ViewData.AddActivePage(ManageNavPages.Users);
+}
+<h2>Список пользователей</h2>
+<table class="table">
+    @foreach (var user in Model)
+    {
+        <tr>
+            <td>@user.Email</td>
+            <td>
+                <a class="btn btn-sm btn-primary" asp-action="EditRole" asp-route-userid="@user.Id">Права доступа</a>
+            </td>
+        </tr>
+    }
+</table>
